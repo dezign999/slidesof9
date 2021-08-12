@@ -16,7 +16,7 @@ bool manualSync = false;
 const char *offsetStatus = "success";
 
 //Set this flag to true if you want to monitor Serial logs
-RTC_DATA_ATTR bool debugger = true;
+RTC_DATA_ATTR bool debugger = false;
 
 const char *menuItems[] = {"Animations", "Sync NTP Time", "Hour Format", "Date Format", "WiFi Mode", "Setup WiFi", "Set Time", "Show Battery"};
 int16_t menuOptions = sizeof(menuItems) / sizeof(menuItems[0]);
