@@ -752,6 +752,7 @@ void WatchySlides999::checkBattery() {
   //    if(charging)
   //    battCalculator = maxVoltage - lowBattMargin;
   //    float batt = (battery - battCalculator) / lowBattMargin;
+//        float batt = 100*(battery - 3.6)/(4.2 - 3.6);
   //    oldVoltage = (oldVoltage == 0) ? batt : ((batt - oldVoltage) > .01)  ? batt : oldVoltage;
 
   if (!chargeSync && charging || battery >= maxVoltage && !chargeSync) {
@@ -769,7 +770,7 @@ void WatchySlides999::checkBattery() {
   if (debugger) {
     Serial.println("maxVoltage: " + String(maxVoltage));
     //      Serial.println("battCalculator: " + String(battCalculator));
-    //      Serial.println("batt: " + String(batt));
+//    Serial.println("batt: " + String(batt));
     Serial.println("battery: " + String(battery));
     Serial.println("oldVoltage: " + String(oldVoltage));
     Serial.println((charging == true) ? "charging" : "not charging");

@@ -31,11 +31,12 @@ class WatchyBase : public Watchy {
     void vibrate(uint8_t times = 1, uint32_t delay_time = 50);
     esp_sleep_wakeup_cause_t wakeup_reason;
     void syncNtpTime();
-    bool connectWiFi();
+    bool wifi999();
     void disableWiFi();
     void twelveModeApp();
     void animationApp();
     void dateModeApp();
+    void wifiModeApp();
     void ntpApp();
     void showList(char *listItems[], byte itemCount, byte listIndex, bool selected, bool partialRefresh);
     void showMenu(byte menuIndex, bool partialRefresh);

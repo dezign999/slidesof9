@@ -8,15 +8,17 @@ RTC_DATA_ATTR bool darkMode = true;
 RTC_DATA_ATTR bool syncNTP = true;
 RTC_DATA_ATTR int animMode = 0;
 RTC_DATA_ATTR int dateMode = 0;
+RTC_DATA_ATTR int wifiMode = 0;
 RTC_DATA_ATTR int selectedItem;
 RTC_DATA_ATTR int syncIndex = 0;
 bool playAnim = false;
 bool manualSync = false;
+const char *offsetStatus = "success";
 
 //Set this flag to true if you want to monitor Serial logs
-RTC_DATA_ATTR bool debugger = false;
+RTC_DATA_ATTR bool debugger = true;
 
-const char *menuItems[] = {"Animations", "Sync NTP Time", "Hour Format", "Date Format", "Set Time", "Setup WiFi", "Show Battery"};
+const char *menuItems[] = {"Animations", "Sync NTP Time", "Hour Format", "Date Format", "WiFi Mode", "Setup WiFi", "Set Time", "Show Battery"};
 int16_t menuOptions = sizeof(menuItems) / sizeof(menuItems[0]);
 
 WatchyBase::WatchyBase() {}
@@ -97,12 +99,15 @@ void WatchyBase::handleButtonPress() {
           dateModeApp();
           break;
         case 4:
-          setTime();
+          wifiModeApp();
           break;
         case 5:
           setupWifi();
           break;
         case 6:
+          setTime();
+          break;
+        case 7:
           showBattery();
           break;
         default:
@@ -202,14 +207,16 @@ void WatchyBase::handleButtonPress() {
               dateModeApp();
               break;
             case 4:
-              setTime();
+              wifiModeApp();
               break;
             case 5:
               setupWifi();
               break;
             case 6:
-              showBattery();
+              setTime();
               break;
+            case 7:
+              showBattery();
             default:
               break;
           }
@@ -504,7 +511,7 @@ void WatchyBase::animationApp() {
     }
 
     if (digitalRead(DOWN_BTN_PIN) == 1) {
-      listIndex == (itemCount -1) ? (listIndex = 0) : listIndex++;
+      listIndex == (itemCount - 1) ? (listIndex = 0) : listIndex++;
       vibrate();
       showList(listItems, itemCount, listIndex, false, true);
     }
@@ -632,14 +639,14 @@ void WatchyBase::ntpApp() {
     }
 
     if (digitalRead(DOWN_BTN_PIN) == 1) {
-      listIndex == (itemCount -1) ? (listIndex = 0) : listIndex++;
+      listIndex == (itemCount - 1) ? (listIndex = 0) : listIndex++;
       synced = false;
       vibrate();
       showList(listItems, itemCount, listIndex, false, true);
     }
 
     if (digitalRead(UP_BTN_PIN) == 1) {
-      listIndex == 0 ? (listIndex = (itemCount -1)) : listIndex--;
+      listIndex == 0 ? (listIndex = (itemCount - 1)) : listIndex--;
       syncNTP = (listIndex == 0) ? true : false;
       synced = false;
       vibrate();
@@ -680,6 +687,68 @@ void WatchyBase::ntpApp() {
   display.hibernate();
   showMenu(menuIndex, false);
 
+}
+
+void WatchyBase::wifiModeApp() {
+
+  char *listItems[] = {"Multi APs", "Default WiFi"};
+  byte itemCount = sizeof(listItems) / sizeof(listItems[0]);
+
+  uint16_t listIndex = wifiMode;
+  uint8_t selectCounter = 0;
+
+  //Send the stored value to set the selected item
+  showList(listItems, itemCount, wifiMode, true, false);
+
+  while (1) {
+
+
+
+    if (digitalRead(BACK_BTN_PIN) == 1) {
+      vibrate();
+      break;
+    }
+
+    if (digitalRead(MENU_BTN_PIN) == 1) {
+      wifiMode = (listIndex == 0) ? 0 : 1;
+      selectCounter++;
+      vibrate();
+      if(selectCounter < 2)
+        showList(listItems, itemCount, listIndex, true, true);
+      if (wifiMode == 1) {
+        display.setTextColor(GxEPD_WHITE);
+        display.setCursor(20, 90);
+        display.println("SSID Reset");
+        display.setCursor(20, 105);
+        display.println("Press Menu");
+        display.setCursor(20, 120);
+        display.println("to Setup WiFi");
+        display.display(true);
+      }
+      if (selectCounter == 2) {
+        setupWifi();
+      }
+    }
+
+    if (digitalRead(DOWN_BTN_PIN) == 1) {
+      listIndex = (listIndex == 0) ? 1 : 0;
+      vibrate();
+      showList(listItems, itemCount, listIndex, false, true);
+      if (debugger)
+        Serial.println(String(listIndex));
+    }
+
+    if (digitalRead(UP_BTN_PIN) == 1) {
+      listIndex = (listIndex == 0) ? 1 : 0;
+      vibrate();
+      showList(listItems, itemCount, listIndex, false, true);
+      if (debugger)
+        Serial.println(String(listIndex));
+    }
+
+  }
+  display.hibernate();
+  showMenu(menuIndex, false);
 }
 
 void WatchyBase::showList(char *listItems[], byte itemCount, byte listIndex, bool selected, bool partialRefresh) {
@@ -733,15 +802,57 @@ void WatchyBase::showList(char *listItems[], byte itemCount, byte listIndex, boo
 void WatchyBase::syncNtpTime() {
 
 
-  if (WiFi.status() != WL_CONNECTED)
+  if (wifiMode == 0) {
+    if (debugger)
+      Serial.println("Trying wifi999");
+    wifi999();
+    if (debugger)
+      Serial.println("Connected to wifi999");
+  } else {
+    if (debugger)
+      Serial.println("Trying WiFi");
     connectWiFi();
+    if (debugger)
+      Serial.println("Connected to WiFi");
+  }
 
   if (WiFi.status() == WL_CONNECTED) {
+
+    if (debugger)
+      Serial.println("Offset: " + String(gmtOffset));
+
+    if (gmtOffset == 0) { //Get Time Offset
+      HTTPClient http;
+      http.setConnectTimeout(3000);//3 second max timeout
+
+      String gmtOffsetURL = "http://ip-api.com/json/?fields=33570816";
+
+      http.begin(gmtOffsetURL.c_str());
+      int httpResponseCode = http.GET();
+      if (httpResponseCode == 200) {
+        String payload = http.getString();
+        JSONVar responseObject = JSON.parse(payload);
+        offsetStatus = responseObject["status"];
+        gmtOffset = int(responseObject["offset"]);
+        if (strcmp(offsetStatus, "success") != 0) {
+          if (manualSync) {
+            display.setCursor(20, 145);
+            display.println("Offset Failed");
+          }
+        }
+      } else {
+        //http error
+        if (manualSync) {
+          display.setCursor(20, 145);
+          display.println("Offset Failed");
+        }
+      }
+    }
+
     time_t t;
     bool syncFailed = false;
 
-    configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);
-    setenv("TZ", TIMEZONE_STRING, 1);
+    configTime(gmtOffset, 0, ntpServer);
 
     int i = 0;
     while (!sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED && i < 20) {
@@ -763,7 +874,7 @@ void WatchyBase::syncNtpTime() {
       struct tm *local = localtime(&tnow);
       if (manualSync) {
         display.setCursor(20, 145);
-        display.println("NTP Received");
+        display.println("Offset: " + String(gmtOffset));
         display.setCursor(20, 160);
         display.print(local->tm_year + 1900);
         display.print("-");
@@ -776,10 +887,10 @@ void WatchyBase::syncNtpTime() {
           display.print("0");
         }
         display.print(local->tm_mday);
+        display.setCursor(20, 175);
         if (local->tm_hour < 10) {
           display.print("0");
         }
-        display.setCursor(20, 175);
         display.print(local->tm_hour);
         display.print(":");
         if (local->tm_min < 10) {
@@ -819,7 +930,7 @@ void WatchyBase::disableWiFi() {
     Serial.println("WiFi Turned Off. IP Check: " + WiFi.localIP());
 }
 
-bool WatchyBase::connectWiFi() {
+bool WatchyBase::wifi999() {
 
   int i, n;
 
@@ -849,7 +960,7 @@ bool WatchyBase::connectWiFi() {
     WIFI_CONFIGURED = true;
   } else {
     WIFI_CONFIGURED = false;
-    disableWiFi();
+    //    disableWiFi();
   }
 
   if (debugger) {
